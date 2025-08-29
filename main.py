@@ -7,9 +7,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 import requests
 from PIL import Image
-import vertexai
-from vertexai.generative_models import GenerativeModel, Part
-from vertexai.preview.vision_models import ImageGenerationModel
+import google.generativeai as genai
 import uvicorn
 from dotenv import load_dotenv
 
@@ -18,12 +16,10 @@ load_dotenv()
 
 app = FastAPI(title="Banana Eye", description="Aerial view generator using Vertex AI and Mapbox")
 
-# Initialize Vertex AI
-project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
-location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
-
-if project_id:
-    vertexai.init(project=project_id, location=location)
+# Initialize Google AI Studio
+gemini_api_key = os.getenv("GEMINI_API_KEY")
+if gemini_api_key:
+    genai.configure(api_key=gemini_api_key)
 
 class AerialViewRequest(BaseModel):
     latitude: float
@@ -59,54 +55,44 @@ def get_mapbox_image(lat: float, lon: float, zoom: int = 15, width: int = 512, h
     return response.content
 
 def generate_enhanced_aerial_view(image_bytes: bytes, text_prompt: str, year: int, altitude: int) -> bytes:
-    """Generate enhanced aerial view image using Vertex AI Imagen based on Mapbox satellite image"""
-    if not project_id:
-        raise HTTPException(status_code=500, detail="Google Cloud project not configured")
+    """Generate enhanced aerial view image using Google AI Studio Gemini 2.5 Flash Image Preview"""
+    if not gemini_api_key:
+        raise HTTPException(status_code=500, detail="Gemini API key not configured")
     
     try:
-        # First, analyze the satellite image with Gemini to understand the location
-        analysis_model = GenerativeModel("gemini-2.0-flash-exp")
-        image_part = Part.from_data(image_bytes, mime_type="image/jpeg")
+        # Create Gemini client
+        model = genai.GenerativeModel("gemini-2.5-flash-image-preview")
         
-        analysis_prompt = f"""
-        Analyze this satellite image and describe the key geographical features, landmarks, and urban/natural elements visible. 
-        Focus on details that would be important for generating an aerial view from {altitude} meters altitude in the year {year}.
-        Be specific about terrain, buildings, water bodies, vegetation, and any notable structures.
-        Keep the description concise but detailed.
-        """
-        
-        analysis_response = analysis_model.generate_content([analysis_prompt, image_part])
-        location_description = analysis_response.text
-        
-        # Generate enhanced aerial view using Imagen
-        imagen_model = ImageGenerationModel.from_pretrained("imagegeneration@006")
+        # Convert image bytes to PIL Image for Gemini
+        image = Image.open(io.BytesIO(image_bytes))
         
         enhanced_prompt = f"""
-        Create a realistic aerial photograph taken from {altitude} meters altitude showing:
-        {location_description}
+        Based on this satellite image, generate a realistic aerial photograph taken from {altitude} meters altitude in the year {year}.
         
-        Additional context: {text_prompt}
-        Time period: {year}
+        User request: {text_prompt}
         
-        Style: High-resolution aerial photography, clear visibility, natural lighting, realistic colors and shadows.
-        The image should look like it was taken from a drone or aircraft at the specified altitude.
-        Show the same geographical area with enhanced detail and perspective appropriate for the altitude.
+        Please create an enhanced aerial view image that shows:
+        - The same geographical location but from the specified altitude perspective
+        - Realistic lighting and atmospheric effects for the given altitude
+        - Enhanced detail and clarity appropriate for the year {year}
+        - Incorporate the user's specific request: {text_prompt}
+        
+        Generate a high-quality aerial photograph that looks like it was captured by a professional drone or aircraft camera.
         """
         
-        # Generate the image
-        images = imagen_model.generate_images(
-            prompt=enhanced_prompt,
-            number_of_images=1,
-            aspect_ratio="1:1",
-            safety_filter_level="allow_most",
-            person_generation="dont_allow"
+        # Generate content with image input
+        response = model.generate_content(
+            [enhanced_prompt, image]
         )
         
-        # Convert generated image to bytes
-        generated_image = images[0]
-        img_byte_arr = io.BytesIO()
-        generated_image._pil_image.save(img_byte_arr, format='JPEG', quality=95)
-        return img_byte_arr.getvalue()
+        # Extract the generated image from the response
+        for part in response.parts:
+            if hasattr(part, 'inline_data') and part.inline_data:
+                if part.inline_data.mime_type.startswith('image/'):
+                    return base64.b64decode(part.inline_data.data)
+        
+        # If no image found in response, raise an error
+        raise HTTPException(status_code=500, detail="No image generated in response")
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate enhanced aerial view: {str(e)}")
@@ -178,8 +164,7 @@ async def health_check():
     """Health check endpoint"""
     checks = {
         "mapbox_token": bool(os.getenv("MAPBOX_ACCESS_TOKEN")),
-        "google_cloud_project": bool(os.getenv("GOOGLE_CLOUD_PROJECT")),
-        "vertex_ai": project_id is not None
+        "gemini_api_key": bool(os.getenv("GEMINI_API_KEY"))
     }
     
     return {
