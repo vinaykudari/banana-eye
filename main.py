@@ -1,6 +1,7 @@
 import os
 import base64
 import io
+import logging
 from typing import Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
@@ -10,6 +11,10 @@ from PIL import Image
 import google.generativeai as genai
 import uvicorn
 from dotenv import load_dotenv
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
 load_dotenv()
@@ -43,58 +48,79 @@ def get_mapbox_image(lat: float, lon: float, zoom: int = 15, width: int = 512, h
     """Get satellite image from Mapbox Static Images API"""
     mapbox_token = os.getenv("MAPBOX_ACCESS_TOKEN")
     if not mapbox_token:
+        logger.error("Mapbox access token not configured")
         raise HTTPException(status_code=500, detail="Mapbox access token not configured")
     
     # Mapbox Static Images API URL for satellite imagery - include token in URL
     url = f"https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/{lon},{lat},{zoom}/{width}x{height}?access_token={mapbox_token}"
+    logger.info(f"Requesting Mapbox image from: {url[:100]}...")
     
     response = requests.get(url)
+    logger.info(f"Mapbox response status: {response.status_code}")
+    
     if response.status_code != 200:
+        logger.error(f"Mapbox API error: {response.text}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch map image: {response.text}")
     
+    logger.info(f"Successfully fetched Mapbox image, content-type: {response.headers.get('content-type')}")
     return response.content
 
 def generate_enhanced_aerial_view(image_bytes: bytes, text_prompt: str, year: int, altitude: int) -> bytes:
     """Generate enhanced aerial view image using Google AI Studio Gemini 2.5 Flash Image Preview"""
     if not gemini_api_key:
+        logger.error("Gemini API key not configured")
         raise HTTPException(status_code=500, detail="Gemini API key not configured")
     
     try:
-        # Create Gemini client
+        logger.info("Creating Gemini model instance")
         model = genai.GenerativeModel("gemini-2.5-flash-image-preview")
         
-        # Convert image bytes to PIL Image for Gemini
         image = Image.open(io.BytesIO(image_bytes))
+        logger.info(f"Converted image to PIL format: {image.size}, mode: {image.mode}")
         
         enhanced_prompt = f"""
         Based on this satellite image, generate a realistic aerial photograph taken from {altitude} meters altitude in the year {year}.
-        
         User request: {text_prompt}
-        
-        Please create an enhanced aerial view image that shows:
-        - The same geographical location but from the specified altitude perspective
-        - Realistic lighting and atmospheric effects for the given altitude
-        - Enhanced detail and clarity appropriate for the year {year}
-        - Incorporate the user's specific request: {text_prompt}
-        
         Generate a high-quality aerial photograph that looks like it was captured by a professional drone or aircraft camera.
         """
         
-        # Generate content with image input
-        response = model.generate_content(
-            [enhanced_prompt, image]
-        )
+        logger.info("Sending request to Gemini API")
+        response = model.generate_content([enhanced_prompt, image])
+        logger.info("Received response from Gemini API")
+
+        # ================================================================
+        # START: ADDED CODE TO CHECK FOR SAFETY BLOCK
+        # ================================================================
+        # The most reliable way to check for a failed generation is to
+        # inspect the prompt_feedback for a block reason.
+        if response.prompt_feedback.block_reason:
+            error_message = f"Image generation blocked by API. Reason: {response.prompt_feedback.block_reason.name}"
+            logger.error(error_message)
+            # Also log the safety ratings for more detail
+            logger.error(f"Safety Ratings: {response.prompt_feedback.safety_ratings}")
+            # Raise an exception that will be caught by the endpoint
+            raise ValueError(error_message)
+        # ================================================================
+        # END: ADDED CODE
+        # ================================================================
+
+        # Your original logic for extracting the image was good, but now it's
+        # protected by the safety check above.
+        if response.parts:
+            for part in response.parts:
+                if part.inline_data and part.inline_data.mime_type.startswith('image/'):
+                    logger.info("Found generated image in response.parts")
+                    # Decode the base64 data to get the image bytes
+                    return part.inline_data.data # The data is already in bytes, no need for b64decode
         
-        # Extract the generated image from the response
-        for part in response.parts:
-            if hasattr(part, 'inline_data') and part.inline_data:
-                if part.inline_data.mime_type.startswith('image/'):
-                    return base64.b64decode(part.inline_data.data)
+        logger.warning("No generated image found in response, returning original image.")
+        return image_bytes
         
-        # If no image found in response, raise an error
-        raise HTTPException(status_code=500, detail="No image generated in response")
-        
+    except ValueError as ve:
+        # Catch the specific error from the safety block check
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
+        logger.error(f"Exception in generate_enhanced_aerial_view: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate enhanced aerial view: {str(e)}")
 
 @app.get("/")
@@ -108,6 +134,9 @@ async def get_aerial_view_endpoint(request: AerialViewRequest):
     Returns image directly viewable in Postman
     """
     try:
+        logger.info(f"Getting aerial view for coordinates: {request.latitude}, {request.longitude}")
+        logger.info(f"Request params - zoom: {request.zoom}, size: {request.width}x{request.height}")
+        
         # Get satellite image from Mapbox
         image_bytes = get_mapbox_image(
             lat=request.latitude,
@@ -117,6 +146,8 @@ async def get_aerial_view_endpoint(request: AerialViewRequest):
             height=request.height
         )
         
+        logger.info(f"Successfully fetched Mapbox image, size: {len(image_bytes)} bytes")
+        
         return Response(
             content=image_bytes,
             media_type="image/jpeg",
@@ -124,6 +155,7 @@ async def get_aerial_view_endpoint(request: AerialViewRequest):
         )
         
     except Exception as e:
+        logger.error(f"Error in get_aerial_view_endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/generate-enhanced-aerial-view")
@@ -133,6 +165,10 @@ async def generate_enhanced_aerial_view_endpoint(request: AerialViewRequest):
     Returns image directly viewable in Postman
     """
     try:
+        logger.info(f"Generating enhanced aerial view for coordinates: {request.latitude}, {request.longitude}")
+        logger.info(f"Request params - altitude: {request.altitude}m, year: {request.year}")
+        logger.info(f"Text prompt: {request.text_prompt}")
+        
         # Get satellite image from Mapbox
         image_bytes = get_mapbox_image(
             lat=request.latitude,
@@ -142,6 +178,8 @@ async def generate_enhanced_aerial_view_endpoint(request: AerialViewRequest):
             height=request.height
         )
         
+        logger.info(f"Fetched Mapbox image, size: {len(image_bytes)} bytes")
+        
         # Generate enhanced aerial view image using Vertex AI
         enhanced_image_bytes = generate_enhanced_aerial_view(
             image_bytes=image_bytes,
@@ -150,6 +188,8 @@ async def generate_enhanced_aerial_view_endpoint(request: AerialViewRequest):
             altitude=request.altitude
         )
         
+        logger.info(f"Generated enhanced image, size: {len(enhanced_image_bytes)} bytes")
+        
         return Response(
             content=enhanced_image_bytes,
             media_type="image/jpeg",
@@ -157,6 +197,7 @@ async def generate_enhanced_aerial_view_endpoint(request: AerialViewRequest):
         )
         
     except Exception as e:
+        logger.error(f"Error in generate_enhanced_aerial_view_endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
