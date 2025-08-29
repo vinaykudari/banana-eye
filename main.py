@@ -79,9 +79,21 @@ def generate_enhanced_aerial_view(image_bytes: bytes, text_prompt: str, year: in
         logger.info(f"Converted image to PIL format: {image.size}, mode: {image.mode}")
         
         enhanced_prompt = f"""
-        Based on this satellite image, generate a realistic aerial photograph taken from {altitude} meters altitude in the year {year}.
-        User request: {text_prompt}
-        Generate a high-quality aerial photograph that looks like it was captured by a professional drone or aircraft camera.
+        Based on the provided satellite image, generate a **realistic aerial landscape photograph** of the same geographical location.
+
+        **Perspective and Altitude:**
+        * Simulate a view as if captured from a professional drone or aircraft camera at an altitude of approximately {altitude} meters.
+        * Focus on presenting a **sweeping landscape vista**, similar to a postcard or travel photograph, rather than a flat, top-down map view.
+        * Include the horizon and a sense of depth, capturing the natural beauty and significant features of the area.
+
+        **Realism and Detail:**
+        * Depict the scene with **high-quality, photorealistic detail** appropriate for the year {year}.
+        * Incorporate realistic lighting, atmospheric effects (e.g., subtle haze, clear skies), and natural colors.
+        * Emphasize the geographical context, showing how different elements (land, water, structures) interact within the broader landscape.
+
+
+
+        Generate a breathtaking aerial landscape photograph that could be used for tourism or scenic appreciation.
         """
         
         logger.info("Sending request to Gemini API")
