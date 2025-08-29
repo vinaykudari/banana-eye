@@ -29,7 +29,6 @@ if gemini_api_key:
 class AerialViewRequest(BaseModel):
     latitude: float
     longitude: float
-    text_prompt: str
     year: Optional[int] = 2024
     altitude: Optional[int] = 1000  # meters
     zoom: Optional[int] = 15
@@ -65,7 +64,7 @@ def get_mapbox_image(lat: float, lon: float, zoom: int = 15, width: int = 512, h
     logger.info(f"Successfully fetched Mapbox image, content-type: {response.headers.get('content-type')}")
     return response.content
 
-def generate_enhanced_aerial_view(image_bytes: bytes, text_prompt: str, year: int, altitude: int) -> bytes:
+def generate_enhanced_aerial_view(image_bytes: bytes, year: int, altitude: int) -> bytes:
     """Generate enhanced aerial view image using Google AI Studio Gemini 2.5 Flash Image Preview"""
     if not gemini_api_key:
         logger.error("Gemini API key not configured")
@@ -179,7 +178,6 @@ async def generate_enhanced_aerial_view_endpoint(request: AerialViewRequest):
     try:
         logger.info(f"Generating enhanced aerial view for coordinates: {request.latitude}, {request.longitude}")
         logger.info(f"Request params - altitude: {request.altitude}m, year: {request.year}")
-        logger.info(f"Text prompt: {request.text_prompt}")
         
         # Get satellite image from Mapbox
         image_bytes = get_mapbox_image(
@@ -195,7 +193,6 @@ async def generate_enhanced_aerial_view_endpoint(request: AerialViewRequest):
         # Generate enhanced aerial view image using Vertex AI
         enhanced_image_bytes = generate_enhanced_aerial_view(
             image_bytes=image_bytes,
-            text_prompt=request.text_prompt,
             year=request.year,
             altitude=request.altitude
         )
