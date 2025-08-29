@@ -28,7 +28,7 @@ def process_coordinates():
         batch_id = f"web_{uuid.uuid4().hex[:8]}"
         
         # Years to process
-        years = [1850, 1950, 2000, 2020]
+        years = [1850, 1950, 2000, 2020, 2050]
         
         # Create a DataFrame with multiple rows (one for each year)
         df_data = {
