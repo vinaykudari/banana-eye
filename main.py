@@ -80,19 +80,22 @@ def generate_enhanced_aerial_view(image_bytes: bytes, year: int, altitude: int) 
         enhanced_prompt = f"""
         Based on the provided satellite image, generate a **realistic aerial landscape photograph** of the same geographical location.
 
-        **Perspective and Altitude:**
-        * Simulate a view as if captured from a professional drone or aircraft camera at an altitude of approximately {altitude} meters.
-        * Focus on presenting a **sweeping landscape vista**, similar to a postcard or travel photograph, rather than a flat, top-down map view.
-        * Include the horizon and a sense of depth, capturing the natural beauty and significant features of the area.
+        **Camera Perspective and Altitude:**
+        * Render the scene as if taken from a professional drone or aircraft-mounted camera at **~{altitude} meters above ground level**.
+        * Ensure that the perspective reflects this altitude:
+        - At lower altitudes (<200m), show finer ground-level detail (buildings, roads, trees).
+        - At medium altitudes (200–2000m), balance close-up features with visible city layout or natural geography.
+        - At higher altitudes (>2000m), emphasize sweeping vistas, large terrain features, coastlines, and horizon curvature.
+        * Maintain a natural oblique aerial angle (not top-down), including the horizon to give a sense of depth.
 
         **Realism and Detail:**
-        * Depict the scene with **high-quality, photorealistic detail** appropriate for the year {year}.
-        * Incorporate realistic lighting, atmospheric effects (e.g., subtle haze, clear skies), and natural colors.
-        * Emphasize the geographical context, showing how different elements (land, water, structures) interact within the broader landscape.
+        * Depict the environment as it would realistically appear in the year {year}.
+        * Use natural atmospheric conditions (e.g., light haze at higher altitudes, crisp clarity at lower).
+        * Apply realistic lighting and shadows consistent with an aerial photograph at the given height.
+        * Preserve key landmarks, water bodies, vegetation, and structures, scaled appropriately for the altitude.
 
-
-
-        Generate a breathtaking aerial landscape photograph that could be used for tourism or scenic appreciation.
+        **Output Goal:**
+        Produce a **breathtaking, photorealistic aerial landscape photograph** suitable for tourism or documentary use, with accuracy in scale and perspective that honors the specified altitude of {altitude} meters.
         """
         
         logger.info("Sending request to Gemini API")
