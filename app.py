@@ -114,17 +114,35 @@ def get_image_content(batch_id, year):
         
         image_path = image_files[0]
         
-        # Read the file content
-        with open(image_path, 'r') as f:
-            content = f.read()
-        
-        return jsonify({
-            'success': True,
-            'year': year,
-            'filename': image_path.name,
-            'content': content,
-            'path': str(image_path)
-        })
+        # Check if it's an image file or text file
+        if image_path.suffix.lower() in ['.png', '.jpg', '.jpeg']:
+            # For image files, encode as base64 for web display
+            with open(image_path, 'rb') as f:
+                image_data = f.read()
+            import base64
+            content_base64 = base64.b64encode(image_data).decode('utf-8')
+            
+            return jsonify({
+                'success': True,
+                'year': year,
+                'filename': image_path.name,
+                'content_type': 'image',
+                'content': content_base64,
+                'path': str(image_path)
+            })
+        else:
+            # For text files, read as text
+            with open(image_path, 'r') as f:
+                content = f.read()
+            
+            return jsonify({
+                'success': True,
+                'year': year,
+                'filename': image_path.name,
+                'content_type': 'text',
+                'content': content,
+                'path': str(image_path)
+            })
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500

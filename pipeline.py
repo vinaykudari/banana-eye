@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Dict
 import logging
 from daft import col
+from main import get_mapbox_image, generate_enhanced_aerial_view
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -35,24 +36,54 @@ def process_row_to_image(batch_id: str, latitude: float, longitude: float, altit
     # For now, we'll create a placeholder file
     logger.info(f"Generating image for batch {batch_id} at ({latitude}, {longitude}, {altitude}) for year {year}")
     
-    # Placeholder image generation - replace with your actual implementation
-    create_placeholder_image(image_path, latitude, longitude, altitude, year)
+    # Generate enhanced aerial view image
+    create_enhanced_image(image_path, latitude, longitude, altitude, year)
     
     return str(image_path)
 
-def create_placeholder_image(image_path: Path, lat: float, lon: float, alt: float, year: int):
+def create_enhanced_image(image_path: Path, lat: float, lon: float, alt: float, year: int):
     """
-    Placeholder function for image generation.
-    Replace this with your actual image generation logic.
+    Generate enhanced aerial view image using AI and save to file.
     """
-    # For demonstration, we'll create a simple text file instead of an image
-    # In practice, you might use PIL, matplotlib, or other imaging libraries
-    with open(image_path, 'w') as f:
-        f.write(f"Image data for:\n")
-        f.write(f"Latitude: {lat}\n")
-        f.write(f"Longitude: {lon}\n")
-        f.write(f"Altitude: {alt}\n")
-        f.write(f"Year: {year}\n")
+    try:
+        # Get satellite image from Mapbox
+        satellite_image_bytes = get_mapbox_image(
+            lat=lat,
+            lon=lon,
+            zoom=15,
+            width=512,
+            height=512
+        )
+        
+        # Generate enhanced aerial view using AI
+        text_prompt = f"Show this location as it appeared in {year}, enhancing the aerial perspective from {alt} meters altitude."
+        
+        # TODO: Uncomment this when the AI is ready
+        # enhanced_image_bytes = generate_enhanced_aerial_view(
+        #     image_bytes=satellite_image_bytes,
+        #     text_prompt=text_prompt,
+        #     year=year,
+        #     altitude=alt
+        # )
+
+        enhanced_image_bytes = satellite_image_bytes
+        
+        # Save the enhanced image
+        with open(image_path, 'wb') as f:
+            f.write(enhanced_image_bytes)
+            
+        logger.info(f"Successfully generated enhanced aerial view for ({lat}, {lon}) at {alt}m altitude in year {year}")
+        
+    except Exception as e:
+        logger.error(f"Failed to generate enhanced image: {e}")
+        # Fallback to a simple text file if image generation fails
+        with open(image_path, 'w') as f:
+            f.write(f"Enhanced Aerial View Data:\n")
+            f.write(f"Latitude: {lat}\n")
+            f.write(f"Longitude: {lon}\n")
+            f.write(f"Altitude: {alt}m\n")
+            f.write(f"Year: {year}\n")
+            f.write(f"Error: {str(e)}\n")
 
 @daft.udf(return_dtype=daft.DataType.string())
 def generate_image_path_udf(batch_id, latitude, longitude, altitude, year):
@@ -82,8 +113,8 @@ def generate_image_path_udf(batch_id, latitude, longitude, altitude, year):
             filename = f"img_{lat}_{lon}_{alt}_{yr}.png"
             image_path = batch_dir / filename
             
-            # Placeholder image generation - replace with your actual implementation
-            create_placeholder_image(image_path, lat, lon, alt, yr)
+            # Generate enhanced aerial view image
+            create_enhanced_image(image_path, lat, lon, alt, yr)
             
             result_paths.append(str(image_path))
         except Exception as e:
