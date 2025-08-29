@@ -57,16 +57,13 @@ def create_enhanced_image(image_path: Path, lat: float, lon: float, alt: float, 
         
         # Generate enhanced aerial view using AI
         text_prompt = f"Show this location as it appeared in {year}, enhancing the aerial perspective from {alt} meters altitude."
-        
-        # TODO: Uncomment this when the AI is ready
-        # enhanced_image_bytes = generate_enhanced_aerial_view(
-        #     image_bytes=satellite_image_bytes,
-        #     text_prompt=text_prompt,
-        #     year=year,
-        #     altitude=alt
-        # )
+        enhanced_image_bytes = generate_enhanced_aerial_view(
+            image_bytes=satellite_image_bytes,
+            text_prompt=text_prompt,
+            year=year,
+            altitude=alt
+        )
 
-        enhanced_image_bytes = satellite_image_bytes
         
         # Save the enhanced image
         with open(image_path, 'wb') as f:
