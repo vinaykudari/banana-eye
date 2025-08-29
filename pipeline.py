@@ -50,16 +50,14 @@ def create_enhanced_image(image_path: Path, lat: float, lon: float, alt: float, 
         satellite_image_bytes = get_mapbox_image(
             lat=lat,
             lon=lon,
-            zoom=15,
+            zoom=14,
             width=512,
             height=512
         )
         
         # Generate enhanced aerial view using AI
-        text_prompt = f"Show this location as it appeared in {year}, enhancing the aerial perspective from {alt} meters altitude."
         enhanced_image_bytes = generate_enhanced_aerial_view(
             image_bytes=satellite_image_bytes,
-            text_prompt=text_prompt,
             year=year,
             altitude=alt
         )
