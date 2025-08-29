@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results - Year Slider</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .batch-info {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 1.1em;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .year-controls {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .year-display {
+            font-size: 3em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .slider-container {
+            margin: 20px 0;
+        }
+
+        .year-slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+            cursor: pointer;
+        }
+
+        .year-slider:hover {
+            opacity: 1;
+        }
+
+        .year-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        .year-slider::-moz-range-thumb {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        .year-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .image-display {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .image-content {
+            background: white;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            text-align: left;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #667eea;
+            font-size: 1.2em;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .back-button {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            transition: background-color 0.3s;
+        }
+
+        .back-button:hover {
+            background: #5a6268;
+            text-decoration: none;
+            color: white;
+        }
+
+        .image-info {
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        .image-info strong {
+            color: #667eea;
+        }
+
+        .download-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 15px;
+            transition: background-color 0.3s;
+        }
+
+        .download-button:hover {
+            background: #218838;
+            text-decoration: none;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🕰️ Time Series Results</h1>
+            <div class="batch-info" id="batchInfo">
+                <strong>Batch ID:</strong> {{ batch_id }}<br>
+                <div id="coordinateInfo">Loading batch information...</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <a href="/" class="back-button">← Back to Coordinate Input</a>
+            
+            <div class="year-controls">
+                <div class="year-display" id="yearDisplay">Loading...</div>
+                <div class="slider-container">
+                    <input type="range" id="yearSlider" class="year-slider" disabled>
+                    <div class="year-labels" id="yearLabels"></div>
+                </div>
+                <p style="color: #666; margin-top: 15px;">
+                    Drag the slider to explore data across different years
+                </p>
+            </div>
+
+            <div class="image-display">
+                <div class="loading" id="loading" style="display: block;">
+                    <div class="spinner"></div>
+                    Loading available years...
+                </div>
+
+                <div id="imageContainer" style="display: none;">
+                    <div class="image-info" id="imageInfo"></div>
+                    <div class="image-content" id="imageContent"></div>
+                    <a href="#" id="downloadLink" class="download-button" target="_blank">📥 Download File</a>
+                </div>
+
+                <div class="error" id="errorContainer" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const batchId = '{{ batch_id }}';
+        let availableYears = [];
+        let currentYearIndex = 0;
+
+        // Load batch information on page load
+        window.addEventListener('load', async function() {
+            await loadBatchInfo();
+        });
+
+        async function loadBatchInfo() {
+            try {
+                const response = await fetch(`/api/batch_info/${batchId}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    availableYears = data.available_years;
+                    
+                    // Update batch info
+                    const coordinateInfo = document.getElementById('coordinateInfo');
+                    coordinateInfo.innerHTML = `
+                        <strong>Coordinates:</strong> ${data.coordinates.latitude}, ${data.coordinates.longitude}<br>
+                        <strong>Altitude:</strong> ${data.coordinates.altitude}m<br>
+                        <strong>Available Years:</strong> ${availableYears.join(', ')}
+                    `;
+
+                    // Setup slider
+                    setupYearSlider();
+                    
+                    // Load first year
+                    if (availableYears.length > 0) {
+                        currentYearIndex = 0;
+                        await loadYear(availableYears[currentYearIndex]);
+                    }
+
+                    document.getElementById('loading').style.display = 'none';
+                } else {
+                    showError(data.error);
+                }
+            } catch (error) {
+                showError('Failed to load batch information: ' + error.message);
+            }
+        }
+
+        function setupYearSlider() {
+            const slider = document.getElementById('yearSlider');
+            const yearLabels = document.getElementById('yearLabels');
+
+            if (availableYears.length === 0) return;
+
+            // Setup slider properties
+            slider.min = 0;
+            slider.max = availableYears.length - 1;
+            slider.value = 0;
+            slider.disabled = false;
+
+            // Create year labels
+            yearLabels.innerHTML = availableYears.map(year => `<span>${year}</span>`).join('');
+
+            // Add event listener
+            slider.addEventListener('input', async function() {
+                currentYearIndex = parseInt(this.value);
+                await loadYear(availableYears[currentYearIndex]);
+            });
+        }
+
+        async function loadYear(year) {
+            const yearDisplay = document.getElementById('yearDisplay');
+            const imageContainer = document.getElementById('imageContainer');
+            const errorContainer = document.getElementById('errorContainer');
+            
+            yearDisplay.textContent = year;
+            imageContainer.style.display = 'none';
+            errorContainer.style.display = 'none';
+
+            try {
+                const response = await fetch(`/api/get_image/${batchId}/${year}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    // Update image info
+                    document.getElementById('imageInfo').innerHTML = `
+                        <strong>Year:</strong> ${data.year}<br>
+                        <strong>Filename:</strong> ${data.filename}<br>
+                        <strong>Path:</strong> ${data.path}
+                    `;
+
+                    // Update image content
+                    document.getElementById('imageContent').textContent = data.content;
+
+                    // Update download link
+                    const downloadLink = document.getElementById('downloadLink');
+                    downloadLink.href = `/download/${batchId}/${data.filename}`;
+
+                    imageContainer.style.display = 'block';
+                } else {
+                    showError(data.error);
+                }
+            } catch (error) {
+                showError('Failed to load image: ' + error.message);
+            }
+        }
+
+        function showError(message) {
+            const errorContainer = document.getElementById('errorContainer');
+            const loading = document.getElementById('loading');
+            
+            errorContainer.textContent = message;
+            errorContainer.style.display = 'block';
+            loading.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
